@@ -17,6 +17,77 @@
 | `GOODS_DATA_DIR` | `/home/admin/goods-api/data` | 宿主机数据目录，挂载到容器 `/app/data` |
 | `NODE_OPTIONS` | `--max-old-space-size=192` | Dockerfile 内置，限制 V8 堆大小 |
 
+## 一键部署
+
+根据服务器当前环境选择对应命令。脚本只安装缺失的部分，已装好的不会重复安装。
+
+### 场景 1：Docker 和 Nginx 都未安装（全新服务器）
+
+```bash
+sudo ./deploy/deploy.sh --domain dongxiu.fun --install all
+```
+
+脚本会：安装 Docker + docker-compose-plugin → 安装 Nginx + certbot → 拉镜像 → 启动容器 → 配 Nginx → 签证书。
+
+### 场景 2：只安装了 Docker，Nginx 未装
+
+```bash
+sudo ./deploy/deploy.sh --domain dongxiu.fun --install nginx
+```
+
+脚本会：安装 Nginx + certbot → 拉镜像 → 启动容器 → 配 Nginx → 签证书。
+
+### 场景 3：只安装了 Nginx，Docker 未装
+
+```bash
+sudo ./deploy/deploy.sh --domain dongxiu.fun --install docker
+```
+
+脚本会：安装 Docker + compose 插件 → 拉镜像 → 启动容器 → 配 Nginx（已存在则跳过）→ 签证书（已存在则跳过）。
+
+### 场景 4：Docker 和 Nginx 都已安装
+
+```bash
+sudo ./deploy/deploy.sh --domain dongxiu.fun
+```
+
+`--install` 默认是 `none`，只部署应用，不装任何系统依赖。
+
+### 可选参数
+
+| 参数 | 说明 |
+| :--- | :--- |
+| `--email <邮箱>` | certbot 邮箱，默认 `admin@<域名>` |
+| `--data-dir <路径>` | 自定义数据目录，默认 `/home/admin/goods-api/data` |
+| `--docker-mirror <url>` | 配置 Docker 镜像加速器，解决拉取 `node:18-slim` 超时 |
+
+示例：全新服务器 + Docker 加速器 + 自定义邮箱
+
+```bash
+sudo ./deploy/deploy.sh --domain dongxiu.fun --install all \
+  --email 1289227619@qq.com \
+  --docker-mirror https://docker.m.daocloud.io
+```
+
+### 前置条件
+
+- 域名 DNS A 记录已指向服务器公网 IP（certbot 依赖）
+- 如需迁移旧数据，先拷贝到数据目录：
+  ```bash
+  scp -r old-server:/home/admin/goods-api/data /home/admin/goods-api/
+  ```
+
+### 脚本幂等性
+
+| 操作 | 重复执行时 |
+| :--- | :--- |
+| 安装 Docker/Nginx | 已安装则 apt 跳过 |
+| 拉镜像、启动容器 | `compose up -d` 会重建容器，数据卷不变 |
+| 写 Nginx 配置 | 文件已存在则跳过，不会覆盖 Certbot 改写版本 |
+| 签发证书 | 证书目录已存在则跳过 |
+
+---
+
 ## 从零部署
 
 ### 0. 前置条件
